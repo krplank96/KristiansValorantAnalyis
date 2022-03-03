@@ -230,6 +230,18 @@ momentum_diff_summary = momentum_diff_df %>%
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
 img <- png::readPNG("./images/valorant_logo.png")
 rast <- grid::rasterGrob(img, interpolate = T)
 
@@ -312,3 +324,15 @@ function_plot_defend + function_plot_attack
 momentum_diff_summary %>%
   kbl() %>%
   kable_material_dark()
+
+
+
+
+
+
+
+
+
+
+
+
