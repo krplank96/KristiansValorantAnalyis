@@ -8,6 +8,9 @@ pacman::p_load(tidyverse, magrittr, janitor, readxl,
                reactable, kableExtra, patchwork)
 
 
+
+`%out%` = Negate(`%in%`)
+
 # other libraries
 # pacman::p_load(tidyverse, magrittr, janitor, readxl,
 #                lubridate, formattable, sf, mapview,
@@ -167,32 +170,76 @@ halftime_score_df_summary = round_history_df %>%
 
 
 # lets fit a function to our plot
+halftime_score_df_summary_sample = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  sample_n(round(nrow(.)/2, 0)) 
 
-halftime_score_df_defend_reg = halftime_score_df_summary %>%
+halftime_score_df_summary_test = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+
+halftime_score_df_summary_sample %<>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+
+
+halftime_score_df_defend_reg = halftime_score_df_summary_sample %>%
   filter(score_diff_at_half != 6 & team1_side_first_half == "Defend")
 
-halftime_score_df_attack_reg = halftime_score_df_summary %>%
+halftime_score_df_attack_reg = halftime_score_df_summary_sample %>%
   filter(score_diff_at_half != 6 & team1_side_first_half == "Attack")
 
 
-reg_defend <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_defend_reg)
-reg_attack <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_attack_reg)
-stargazer(reg_defend, reg_attack, type = "text")
+halftime_score_df_defend_reg_test = halftime_score_df_summary_test %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Defend")
+
+halftime_score_df_attack_reg_test = halftime_score_df_summary_test %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Attack")
+
+
+# create regressions for attack and defend
+#linear regressions
+reg_defend_linear <- lm(pct_victory ~ score_diff_at_half, data=halftime_score_df_defend_reg)
+reg_attack_linear <- lm(pct_victory ~ score_diff_at_half, data=halftime_score_df_attack_reg)
+#non linear regressions
+reg_defend_non_linear_1 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2), data=halftime_score_df_defend_reg)
+reg_attack_non_linear_1 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2), data=halftime_score_df_attack_reg)
+#non linear regressions with cubed piece
+reg_defend_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_defend_reg)
+reg_attack_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_attack_reg)
+
+# stargazer of model
+
+stargazer(reg_defend_linear, reg_attack_linear, 
+          reg_defend_non_linear_1, reg_attack_non_linear_1,
+          reg_defend_non_linear_2, reg_attack_non_linear_2, 
+          type = "text")
 
 
 # save predictions of the model in the new data frame 
 # together with variable you want to plot against
-halftime_score_df_defend = halftime_score_df_summary %>%
+halftime_score_df_defend = halftime_score_df_summary_test %>%
   filter(team1_side_first_half == "Defend")
 
-predicted_defend_df <- data.frame(pct_victory_pred = predict(reg_defend, halftime_score_df_defend))
+predicted_defend_df <- data.frame(pct_victory_pred = predict(reg_defend_non_linear_2, halftime_score_df_defend))
 predicted_defend_df = cbind(halftime_score_df_defend, predicted_defend_df)
 
-halftime_score_df_attack = halftime_score_df_summary %>%
+halftime_score_df_attack = halftime_score_df_summary_test %>%
   filter(team1_side_first_half == "Attack")
 
-predicted_attack_df <- data.frame(pct_victory_pred = predict(reg_attack, halftime_score_df_attack))
+predicted_attack_df <- data.frame(pct_victory_pred = predict(reg_attack_non_linear_2, halftime_score_df_attack))
 predicted_attack_df = cbind(halftime_score_df_attack, predicted_attack_df)
+
+
+
 
 
 

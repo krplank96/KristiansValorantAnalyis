@@ -9,7 +9,7 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-What is the 9-3 Curse? Is it real? If you are already familiar with Valorant and the dreaded “9-3 Curse”, feel free to skip ahead to *here* section. Valorant is a free-to-play first-person hero shooter played both casually and competitively. The game is played in 5 vs. 5 round based format. A match of Valorant is played first to 13 rounds, with a maximum of 24 rounds, each round has a timer 1 minute and 40 seconds. In each round one team is on attack with their objective being to plant a spike at one of two locations or sites on the map, which will then take time to detonate. The attackers can win the round by allowing the spike to detonate or eliminating the defending team. The defenders win by eliminating the attacking team prior to planting the spike, defusing a planted spike, or allowing time to run out. Upon completion of 12 rounds, the teams switch sides, attackers become defenders and vice versa. If the game is tied at 12-12 on the 24th round the match goes into overtime. Prior to each round players purchases weapons and abilities using the in-game economy. If a player survives with a weapon it can be brought into the next round, but abilities will carry over from round to round until used by the player. A winning team is awarded more money than the losing team, but losing teams earn progressively more money each round they have lost in a row. At the start of the 2nd half, money and equipment is reset. 
+What is the 9-3 Curse? Is it real? If you are already familiar with Valorant and the dreaded “9-3 Curse”, feel free to skip ahead to *this* section. Valorant is a free-to-play first-person hero shooter played both casually and competitively. The game is played in 5 vs. 5 round based format. A match of Valorant is played first to 13 rounds, with a maximum of 24 rounds, each round has a timer 1 minute and 40 seconds. In each round one team is on attack with their objective being to plant a spike at one of two locations or sites on the map, which will then take time to detonate. The attackers can win the round by allowing the spike to detonate or eliminating the defending team. The defenders win by eliminating the attacking team prior to planting the spike, defusing a planted spike, or allowing time to run out. Upon completion of 12 rounds, the teams switch sides, attackers become defenders and vice versa. If the game is tied at 12-12 on the 24th round the match goes into overtime. Prior to each round players purchases weapons and abilities using the in-game economy. If a player survives with a weapon it can be brought into the next round, but abilities will carry over from round to round until used by the player. A winning team is awarded more money than the losing team, but losing teams earn progressively more money each round they have lost in a row. At the start of the 2nd half, money and equipment is reset. 
 
 
 ```{r libraries, warning = FALSE, echo = FALSE}
@@ -21,6 +21,9 @@ pacman::p_load(tidyverse, magrittr, janitor, readxl,
                gganimate, gifski, zoo,  
                RSQLite, ggdark, showtext, mosaic,
                reactable, kableExtra, patchwork)
+
+# additional functions
+`%out%` = Negate(`%in%`)
 
 # change text size for ggplots
 text_size_val = 28
@@ -226,37 +229,75 @@ Depending on our definition of the 9-3 Curse, these numbers seem quite definitiv
 ```{r regression _plots, echo=FALSE, results = 'asis', warning = FALSE, message = FALSE}
 
 # lets fit a function to our plot
+halftime_score_df_summary_sample = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  sample_n(round(nrow(.)/2, 0)) 
 
-halftime_score_df_defend_reg = halftime_score_df_summary %>%
+halftime_score_df_summary_test = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+
+halftime_score_df_summary_sample %<>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+
+
+halftime_score_df_defend_reg = halftime_score_df_summary_sample %>%
   filter(score_diff_at_half != 6 & team1_side_first_half == "Defend")
 
-halftime_score_df_attack_reg = halftime_score_df_summary %>%
+halftime_score_df_attack_reg = halftime_score_df_summary_sample %>%
   filter(score_diff_at_half != 6 & team1_side_first_half == "Attack")
 
 
-reg_defend <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_defend_reg)
-reg_attack <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_attack_reg)
+halftime_score_df_defend_reg_test = halftime_score_df_summary_test %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Defend")
+
+halftime_score_df_attack_reg_test = halftime_score_df_summary_test %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Attack")
 
 
-# visual of our regression
-stargazer(reg_defend, reg_attack, type = "html")
+# create regressions for attack and defend
+#linear regressions
+reg_defend_linear <- lm(pct_victory ~ score_diff_at_half, data=halftime_score_df_defend_reg)
+reg_attack_linear <- lm(pct_victory ~ score_diff_at_half, data=halftime_score_df_attack_reg)
+#non linear regressions
+reg_defend_non_linear_1 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2), data=halftime_score_df_defend_reg)
+reg_attack_non_linear_1 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2), data=halftime_score_df_attack_reg)
+#non linear regressions with cubed piece
+reg_defend_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_defend_reg)
+reg_attack_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_attack_reg)
 
+# stargazer of model
 
+stargazer(reg_defend_linear, reg_attack_linear, 
+          reg_defend_non_linear_1, reg_attack_non_linear_1,
+          reg_defend_non_linear_2, reg_attack_non_linear_2, 
+          type = "html")
 
 
 # save predictions of the model in the new data frame 
 # together with variable you want to plot against
-halftime_score_df_defend = halftime_score_df_summary %>%
+halftime_score_df_defend = halftime_score_df_summary_test %>%
   filter(team1_side_first_half == "Defend")
 
-predicted_defend_df <- data.frame(pct_victory_pred = predict(reg_defend, halftime_score_df_defend))
+predicted_defend_df <- data.frame(pct_victory_pred = predict(reg_defend_non_linear_2, halftime_score_df_defend))
 predicted_defend_df = cbind(halftime_score_df_defend, predicted_defend_df)
 
-halftime_score_df_attack = halftime_score_df_summary %>%
+halftime_score_df_attack = halftime_score_df_summary_test %>%
   filter(team1_side_first_half == "Attack")
 
-predicted_attack_df <- data.frame(pct_victory_pred = predict(reg_attack, halftime_score_df_attack))
+predicted_attack_df <- data.frame(pct_victory_pred = predict(reg_attack_non_linear_2, halftime_score_df_attack))
 predicted_attack_df = cbind(halftime_score_df_attack, predicted_attack_df)
+
+
 
 
 
