@@ -206,9 +206,14 @@ reg_attack_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at
 
 # stargazer of model
 
+
 stargazer(reg_defend_linear, reg_attack_linear, 
           reg_defend_non_linear_1, reg_attack_non_linear_1,
           reg_defend_non_linear_2, reg_attack_non_linear_2, 
+          dep.var.labels = "% Victorious",
+          column.labels=c("Defend","Attack", "Defend","Attack", "Defend","Attack"),
+          covariate.labels = 
+            c("Score Difference at Half", "core Difference at Half (Squared)", "Score Difference at Half (Cubed)"),
           type = "text")
 
 
