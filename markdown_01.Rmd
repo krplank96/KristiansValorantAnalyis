@@ -227,17 +227,16 @@ Depending on our definition of the 9-3 Curse, these numbers seem quite definitiv
 
 
 ```{r regression _plots, echo=FALSE, results = 'asis', warning = FALSE, message = FALSE}
-
 # lets fit a function to our plot
 halftime_score_df_summary_sample = round_history_df %>%
   mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
-  filter(!is.na(score_diff_at_half)) %>%
-  sample_n(round(nrow(.)/2, 0)) 
+  filter(!is.na(score_diff_at_half)) #%>%
+  #sample_n(round(nrow(.)/2, 0)) 
 
 halftime_score_df_summary_test = round_history_df %>%
   mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
   filter(!is.na(score_diff_at_half)) %>%
-  filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
+  #filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
   group_by(score_diff_at_half, team1_side_first_half) %>%
   summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
   mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
@@ -300,7 +299,6 @@ predicted_attack_df = cbind(halftime_score_df_attack, predicted_attack_df)
 
 
 
-
 ```
 In order to do this we create two regressions based of the data from the chart above. Our dependent variable will be the percentage chance of victory and our independent variable will be our round lead. Again we will just limit, this to positive round leads, as negative round leads would just be the inverse. We also create two different regressions with data for teams with a lead on the defenders side and one for teams on the attacking side. We have also removed the data point where the round lead is at +6, (our supposedly cursed lead), in order to not fit the regression using this data point as we suspect it to be substantially different than the others. We than create two regressions with results shown below:
 
@@ -359,6 +357,26 @@ function_plot_defend + function_plot_attack
 
 ```
 
+
+
+
+```{r predicted_vs_actual, warning = FALSE, echo = FALSE, message = FALSE, fig.width= 10, fig.height= 5}
+
+
+# lets compare each of the points to their predicted point
+predicted_defend_df %>%
+  rbind(predicted_attack_df)  %>%
+  mutate(Residual = abs(pct_victory - pct_victory_pred)) %>%
+  rename(`Score Difference` = score_diff_at_half, `First Half Side` = team1_side_first_half,
+         `% Victorious` = pct_victory, `% Victorious (Predicted)` = pct_victory_pred,
+         ) %>%
+  mutate(`% Victorious` = paste0(round(`% Victorious`, 4)*100, "%"),
+         `% Victorious (Predicted)` = paste0(round(`% Victorious (Predicted)`, 4)*100, "%") ,
+         Residual = paste0(round(Residual, 4)*100, "%") ) %>%
+  kbl() %>%
+  kable_material_dark()
+
+```
 
 
 

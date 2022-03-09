@@ -11,18 +11,6 @@ pacman::p_load(tidyverse, magrittr, janitor, readxl,
 
 `%out%` = Negate(`%in%`)
 
-# other libraries
-# pacman::p_load(tidyverse, magrittr, janitor, readxl,
-#                lubridate, formattable, sf, mapview,
-#                ggplot2, scales, DT, stargazer, ggthemes,
-#                stringdist, fuzzyjoin, stringr, bdscale, 
-#                leaflet, reshape2, dplyr, reactable, sp,
-#                ggrepel, ggalt, tidyr, plotly, data.table,
-#                gganimate, gifski, png, grid, gridExtra,
-#                leaflet.extras, hablar, crosstalk, ggdark, 
-#                leafpop, downloadthis, zoo, keyring, DBI, odbc,
-#                ggfittext, imputeTS, RSQLite)
-
 # Source for Valorant Pro Matches
 # https://www.kaggle.com/visualize25/valorant-pro-matches-full-data
 
@@ -172,13 +160,13 @@ halftime_score_df_summary = round_history_df %>%
 # lets fit a function to our plot
 halftime_score_df_summary_sample = round_history_df %>%
   mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
-  filter(!is.na(score_diff_at_half)) %>%
-  sample_n(round(nrow(.)/2, 0)) 
+  filter(!is.na(score_diff_at_half)) #%>%
+  #sample_n(round(nrow(.)/2, 0)) 
 
 halftime_score_df_summary_test = round_history_df %>%
   mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
   filter(!is.na(score_diff_at_half)) %>%
-  filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
+  #filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
   group_by(score_diff_at_half, team1_side_first_half) %>%
   summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
   mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
@@ -361,6 +349,21 @@ function_plot_attack = ggplot(data = predicted_attack_df, aes(x = score_diff_at_
 
 
 function_plot_defend + function_plot_attack
+
+
+
+# lets compare each of the points to their predicted point
+predicted_defend_df %>%
+  rbind(predicted_attack_df)  %>%
+  mutate(Residual = abs(pct_victory - pct_victory_pred)) %>%
+  rename(`Score Difference` = score_diff_at_half, `First Half Side` = team1_side_first_half,
+         `% Victorious` = pct_victory, `% Victorious (Predicted)` = pct_victory_pred,
+         ) %>%
+  mutate(`% Victorious` = paste0(round(`% Victorious`, 4)*100, "%"),
+         `% Victorious (Predicted)` = paste0(round(`% Victorious (Predicted)`, 4)*100, "%") ,
+         Residual = paste0(round(Residual, 4)*100, "%") ) %>%
+  kbl() %>%
+  kable_material_dark()
 
 
 
