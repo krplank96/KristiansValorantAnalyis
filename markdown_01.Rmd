@@ -385,34 +385,63 @@ predicted_defend_df %>%
 
 
 ```{r momentum, warning = FALSE, echo = FALSE, message = FALSE}
+
+
 # what does momentum do to the 9-3 curse
 # ID rounds with chance of momentum
 possible_momentum = round_history_df %>%
-  filter(paste0(team1_rounds, "-", team2_rounds) %in% c("9-1", "1-9")) 
-
-# create new df with matches marked as comeback or no momentum 
-momentum_diff_df = round_history_df %>%
+  group_by(game_id) %>%
+  arrange(game_id, round) %>%
+  mutate(two_round_lag = lag(round_difference, 2)) %>%
   mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
   filter(!is.na(score_diff_at_half)) %>%
-  filter(round_difference == 6 | round_difference == -6) %>%
-  mutate(momentum_dummy = ifelse(game_id %in% possible_momentum$game_id, "Comeback", "No Momentum")) 
+  mutate(
+    momentum_dummy = case_when(
+      two_round_lag == -8 & round_difference == -6 ~ "Comeback", # 1-9 to 3-9
+      two_round_lag == 8 & round_difference == 6 ~ "Comeback", # 9-1 to 9-3 
+      two_round_lag == -6 & round_difference == -4 ~ "Comeback", # 2-8 to 4-8
+      two_round_lag == 6 & round_difference == 4 ~ "Comeback", # 8-2 to 8-4
+      two_round_lag == -4 & round_difference == -2 ~ "Comeback", # 3-7 to 5-7
+      two_round_lag == 4 & round_difference == 2 ~ "Comeback", # 7-3 to 7-5
+      two_round_lag == -10 & round_difference == -8 ~ "Comeback", # 0-10 to 2-10
+      two_round_lag == 10 & round_difference == 8 ~ "Comeback", # 10-0 to 10-2
+      TRUE                      ~ "No Momentum"
+    )
+  )
   
-momentum_diff_summary = momentum_diff_df %>%
-  group_by(momentum_dummy, score_diff_at_half, team1_side_first_half) %>%
+
+# summarise the momentum data
+momentum_diff_summary = possible_momentum %>%
+  mutate(score_line = paste0(team1_rounds, "-", team2_rounds)) %>%
+  group_by(momentum_dummy, score_line, round_difference, team1_side_first_half) %>%
   summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
-  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend"),
-         pct_victory = paste0(round(pct_victory, 3)*100, "%")) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(abs(round_difference) %out% c(0, 10, 12)) %>%
+  arrange(round_difference, team1_side_first_half) %>%
   pivot_wider(names_from = "momentum_dummy", values_from = "pct_victory") %>%
-  mutate(`Score Line` = ifelse(score_diff_at_half == -6, "3-9", "9-3")) %>%
   ungroup() %>%
-  select(`Score Line`, `Start Side` = team1_side_first_half, `No Momentum`, `Comeback`) 
+  mutate(`Momentum Difference` =  `Comeback` - `No Momentum`) %>%
+  filter(round_difference < 0) %>%
+  select(`Score Line` = score_line, `Start Side` = team1_side_first_half, `No Momentum`, `Comeback`, `Momentum Difference`) %>%
+  mutate(`No Momentum` = paste0(round(`No Momentum`, 3)*100, "%"),
+         `Comeback` = paste0(round(`Comeback`, 3)*100, "%"),
+         `Momentum Difference` = paste0(round(`Momentum Difference`, 3)*100, "%"))
+
+
+
+
+
+
 
 
 ```
 
 
 
+### Momentum
+While it may seem like the 9-3 curse is simply non-existent, one factor we have not looked into is momentum. Due to Valorant being a round based game with an economy being persistent from round, winning multiple rounds in a row is beneficial in a very tangible way and also most likely has a strong psychological effect even when the economy is not being taken into account, at the start of a second half for example. 
 
+In the chart below we can see the difference that winning the last rounds in the half has for increasing a teams win percentage. If the teams at least the last two rounds in the half we classify the teams as having a "Comeback", or otherwise having "No Momentum". As is expected being at a deficit at the end of your attack half is generally less detrimental compared to being at a deficit on defense, so these are also separated. 
 
 
 ```{r momentum_table, echo=FALSE, warning = FALSE, fig.width= 10, fig.height= 5}
@@ -425,4 +454,6 @@ momentum_diff_summary %>%
 
 
 ```
+
+
 

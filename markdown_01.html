@@ -196,7 +196,29 @@ pre code {
 <td style="text-align:left">
 </td>
 <td colspan="6">
-pct_victory
+% Victorious
+</td>
+</tr>
+<tr>
+<td style="text-align:left">
+</td>
+<td>
+Defend
+</td>
+<td>
+Attack
+</td>
+<td>
+Defend
+</td>
+<td>
+Attack
+</td>
+<td>
+Defend
+</td>
+<td>
+Attack
 </td>
 </tr>
 <tr>
@@ -227,7 +249,7 @@ pct_victory
 </tr>
 <tr>
 <td style="text-align:left">
-score_diff_at_half
+Score Difference at Half
 </td>
 <td>
 0.043<sup>***</sup>
@@ -288,7 +310,7 @@ score_diff_at_half
 </tr>
 <tr>
 <td style="text-align:left">
-I(score_diff_at_half2)
+core Difference at Half (Squared)
 </td>
 <td>
 </td>
@@ -345,7 +367,7 @@ I(score_diff_at_half2)
 </tr>
 <tr>
 <td style="text-align:left">
-I(score_diff_at_half3)
+Score Difference at Half (Cubed)
 </td>
 <td>
 </td>
@@ -854,6 +876,10 @@ Attack
 </tr>
 </tbody>
 </table>
+<div id="momentum" class="section level3">
+<h3>Momentum</h3>
+<p>While it may seem like the 9-3 curse is simply non-existent, one factor we have not looked into is momentum. Due to Valorant being a round based game with an economy being persistent from round, winning multiple rounds in a row is beneficial in a very tangible way and also most likely has a strong psychological effect even when the economy is not being taken into account, at the start of a second half for example.</p>
+<p>In the chart below we can see the difference that winning the last rounds in the half has for increasing a teams win percentage. If the teams at least the last two rounds in the half we classify the teams as having a “Comeback”, or otherwise having “No Momentum”. As is expected being at a deficit at the end of your attack half is generally less detrimental compared to being at a deficit on defense, so these are also separated.</p>
 <table class=" lightable-material-dark" style="font-family: &quot;Source Sans Pro&quot;, helvetica, sans-serif; margin-left: auto; margin-right: auto;">
 <thead>
 <tr>
@@ -869,9 +895,46 @@ No Momentum
 <th style="text-align:left;">
 Comeback
 </th>
+<th style="text-align:left;">
+Momentum Difference
+</th>
 </tr>
 </thead>
 <tbody>
+<tr>
+<td style="text-align:left;">
+2-10
+</td>
+<td style="text-align:left;">
+Attack
+</td>
+<td style="text-align:left;">
+3.9%
+</td>
+<td style="text-align:left;">
+3.8%
+</td>
+<td style="text-align:left;">
+0%
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+2-10
+</td>
+<td style="text-align:left;">
+Defend
+</td>
+<td style="text-align:left;">
+1.8%
+</td>
+<td style="text-align:left;">
+0%
+</td>
+<td style="text-align:left;">
+-1.8%
+</td>
+</tr>
 <tr>
 <td style="text-align:left;">
 3-9
@@ -884,6 +947,9 @@ Attack
 </td>
 <td style="text-align:left;">
 14.9%
+</td>
+<td style="text-align:left;">
+5.3%
 </td>
 </tr>
 <tr>
@@ -899,37 +965,81 @@ Defend
 <td style="text-align:left;">
 7.8%
 </td>
+<td style="text-align:left;">
+0.7%
+</td>
 </tr>
 <tr>
 <td style="text-align:left;">
-9-3
+4-8
 </td>
 <td style="text-align:left;">
 Attack
 </td>
 <td style="text-align:left;">
-92.9%
+18.9%
 </td>
 <td style="text-align:left;">
-92.2%
+19.2%
+</td>
+<td style="text-align:left;">
+0.3%
 </td>
 </tr>
 <tr>
 <td style="text-align:left;">
-9-3
+4-8
 </td>
 <td style="text-align:left;">
 Defend
 </td>
 <td style="text-align:left;">
-90.5%
+16.3%
 </td>
 <td style="text-align:left;">
-85.1%
+18.3%
+</td>
+<td style="text-align:left;">
+1.9%
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+5-7
+</td>
+<td style="text-align:left;">
+Attack
+</td>
+<td style="text-align:left;">
+33.8%
+</td>
+<td style="text-align:left;">
+35.9%
+</td>
+<td style="text-align:left;">
+2.1%
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+5-7
+</td>
+<td style="text-align:left;">
+Defend
+</td>
+<td style="text-align:left;">
+29.6%
+</td>
+<td style="text-align:left;">
+32.6%
+</td>
+<td style="text-align:left;">
+3.1%
 </td>
 </tr>
 </tbody>
 </table>
+</div>
 
 
 
