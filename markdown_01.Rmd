@@ -25,10 +25,10 @@ What is the 9-3 Curse?
 <br>
 Is it real? 
 <br>
-If you are already familiar with Valorant and the dreaded “9-3 Curse”, feel free to skip ahead to the analysis section. Valorant is a free-to-play first-person hero shooter played both casually and competitively. The game is played in 5 vs. 5 round based format. A match of Valorant is played first to 13 rounds, with a maximum of 24 rounds, each round has a timer 1 minute and 40 seconds. In each round one team is on attack with their objective being to plant a spike at one of two locations or sites on the map, which will then take time to detonate. The attackers can win the round by allowing the spike to detonate or eliminating the defending team. The defenders win by eliminating the attacking team prior to planting the spike, defusing a planted spike, or allowing time to run out. 
+If you are already familiar with Valorant and the dreaded “9-3 Curse,” feel free to skip ahead to the "Analysis" section. Valorant is a free-to-play first-person hero shooter played both casually and competitively. The game is played in a 5 vs. 5 round based format. The first team to win 13 of 24 possible rounds wins a match of Valorant is played first to 13 rounds. Each round has a timer of 1 minute and 40 seconds. In each round, one team is on Attack with their objective being to plant a Spike at one of two locations or "sites" on the map, which will then take time to detonate. The attackers can win the round by allowing the spike to detonate or eliminating the defending team. The defenders win by eliminating the attacking team prior to planting the spike, defusing a planted spike, or allowing the round timer to run out.
 <br>
 <br>
-Upon completion of 12 rounds, the teams switch sides, attackers become defenders and vice versa. If the game is tied at 12-12 on the 24th round the match goes into overtime. Prior to each round players purchases weapons and abilities using the in-game economy. If a player survives with a weapon it can be brought into the next round, but abilities will carry over from round to round until used by the player. A winning team is awarded more money than the losing team, but losing teams earn progressively more money each round they have lost in a row. At the start of the 2nd half, money and equipment is reset. 
+Upon completion of 12 rounds, the teams switch sides  — attackers become defenders, and vice versa. If the game is tied at 12-12 on the 24th round, the match goes into Overtime. Prior to each round, players purchases weapons and abilities using the in-game economy. If a player survives with a weapon it can be brought into the next round, but abilities will carry over from round to round until used by the player. A winning team is awarded more money than the losing team, but losing teams earn progressively more money each round they have lost in a row. At the start of the second half, money and equipment is reset.
 
 
 <br>
@@ -78,8 +78,7 @@ for (i in seq(along=tables)) {
 ```
 
 ### Analysis
-First a special thanks to Joshua Broas on Kaggle who pulled all of the data used in this analysis from Vlr.gg. The data being used includes approx. 11.5k pro and semi-pro Valorant matches as of January 2022. 
-	For starters, we have to identify what would define the 9-3 Curse. If we would expect that a team down 3-9 is more likely to win the game than its counterpart that is up 9–3 at half. The chart below shows the percentage of matches won at each round differential at half. 
+First, a special thanks to Joshua Broas on Kaggle who pulled all of the data used in this analysis from Vlr.gg. The data I used in this analysis includes approximately 11.5k pro and semi-pro Valorant matches as of January 2022. For starters, we have to identify what would define the 9-3 Curse, it is that we would expect that a team down 3-9 is more likely to win the game than its counterpart that is up 9–3 at the attacker/defender switch halfway through the maximum round count. The chart below shows the percentage of matches won at each round differential at half.
 <br>
 <br>
 
@@ -244,13 +243,13 @@ round_diff_plot
 ```
 <br>
 <br>
-This initial analysis would show the curse to be false. In the chart, the X-axis is the round difference at half, i.e. a round difference of 0 would be a 6-6 half and a round difference of 12 would be a 12-0 half. The chart labeled “Attack” is for teams starting on attack and vice-versa for “Defend”. These are important to note as Valorant is generally a defense sided game, as defenders will win more rounds than attackers. This chart shows that when the score is tied 6-6 at half, attackers the team that started as attack will win 53.1% of matches compared to the defending team winning 45.9% of matches.
+This initial analysis would show the curse to be false. In the chart, the X-axis is the round difference at half, i.e. a round difference of 0 would be a 6-6 half and a round difference of 12 would be a 12-0 half. The chart labeled “Attack” is for teams starting on attack and vice-versa for “Defend.” These are important to note as Valorant is generally a defense-sided game, as defenders will win more rounds than attackers. This chart shows that when the score is tied 6-6 at half, the team that started on the attack side will win 53.1% of matches compared to the defending team winning 45.9% of matches.
 <br>
 <br>
- 	As one would expect, having an advantage of 6 rounds is always beneficial with win percentages above 90% on both Attack and Defense. Furthermore, it is clearly not beneficial to have a scoreline of 8-4 to avoid the 9-3 Curse, as this lowers the percentage win to roughly 80% for the leading team. 
+As one would expect, having an advantage of 6 rounds is always beneficial with win percentages above 90% on both Attack and Defense. Furthermore, it is clearly not beneficial to have a scoreline of 8-4 to avoid the 9-3 Curse, as this lowers the percentage win to roughly 80% for the leading team.
 <br>
 <br>
-Depending on our definition of the 9-3 Curse, these numbers seem quite definitive, having a lead of 6 rounds means said leader will win 9 out of 10 games. However, while having a score difference of 9-3 at half may increase your % chance to win versus having an 8-4 lead, the question still remains, does it increase the % of victory as much as we would expect. To understand what percentage of victory we should expect we will need to create a function to understand how an increase in round difference at half is correlated with the percentage of victory. 
+Depending on our definition of the 9-3 Curse, these numbers seem quite definitive, having a lead of 6 rounds means said leader will win 9 out of 10 games. However, while having a score difference of 9-3 at half may increase your % chance to win versus having an 8-4 lead, the question still remains  — does it increase the % of victory as much as we would expect? To understand what percentage of victory we should expect, we will need to create a function to understand how an increase in round difference at half is correlated with the percentage likelihood of victory. 
 
 <br>
 
@@ -334,13 +333,13 @@ predicted_attack_df = cbind(halftime_score_df_attack, predicted_attack_df)
 ```
 
 <br>
-In order to do this we create two regressions based of the data from the chart above. Our dependent variable will be the percentage chance of victory and our independent variable will be our round lead. Again we will just limit, this to positive round leads, as negative round leads would just be the inverse. We also create two different regressions with data for teams with a lead on the defenders side and one for teams on the attacking side. We have also removed the data point where the round lead is at +6, (our supposedly cursed lead), in order to not fit the regression using this data point as we suspect it to be substantially different than the others. We than create two regressions with results shown below:
+In order to do this we create two regressions based on the data from the chart above. Our dependent variable will be the percentage chance of victory and our independent variable will be our round lead. Again we will just limit this to positive round leads, as negative round leads would simply be the inverse. We also create two different regressions with data for teams with a lead on the defenders side and one for teams on the attacking side. We have also removed the data point where the round lead is at +6, (our supposedly cursed lead), in order to not fit the regression using this data point as we suspect it to be substantially different than the others. We than create two regressions with results shown below:
 <br>
 <br>
-The R^2 for these is as we would expect quite high nearly .99, indicating a near exact fit. If we now use predict the values for a round lead based off this we can get a residual for +6 of :
+The R^2 for these is as we would expect quite high —  nearly .99, indicating a near exact fit. If we now use predict the values for a round lead based off this we can get a residual for +6 of :
 <br>
 <br>
-To answer the question of if the increase of percentage victory is substantially different than what we would expect, the answer is no. 
+To answer the question of if the increase of percentage victory is substantially different than what we would expect, the answer is no.
 
 
 <br>
@@ -414,7 +413,7 @@ predicted_defend_df %>%
 ```
 <br>
 <br>
-In the above table we compare our predicted values for % Victorious versus our actual values. However, our residuals don't appear significant enough to suggest that a round difference of 6 rounds at half (a score line of 9-3), is signficantly different from the function we are using to calculate the other score differences.
+In the above table we compare our predicted values for % Victorious versus our actual values. However, our residuals don’t appear significant enough to suggest that a round difference of 6 rounds at half (a score line of 9-3), is significantly different from the function we are using to calculate the other score differences.
 
 ```{r momentum, warning = FALSE, echo = FALSE, message = FALSE}
 
@@ -473,9 +472,9 @@ momentum_diff_summary = possible_momentum %>%
 <br>
 
 ### Momentum
-While it may seem like the 9-3 curse is simply non-existent, one factor we have not looked into is momentum. Due to Valorant being a round based game with an economy being persistent from round, winning multiple rounds in a row is beneficial in a very tangible way and also most likely has a strong psychological effect even when the economy is not being taken into account, at the start of a second half for example. 
+While it may seem like the 9-3 curse is simply non-existent, one factor we have not looked into is momentum. Due to Valorant being a round based game with an economy being persistent from round, winning multiple rounds in a row is beneficial in a very tangible way and also most likely has a strong psychological effect on the players in the game, even when the economy is not being taken into account  —  for example, at the start of a second half.
 
-In the chart below we can see the difference that winning the last rounds in the half has for increasing a teams win percentage. If the teams at least the last two rounds in the half we classify the teams as having a "Comeback", or otherwise having "No Momentum". As is expected being at a deficit at the end of your attack half is generally less detrimental compared to being at a deficit on defense, so these are also separated. 
+In the chart below we can see the difference that winning the last rounds in the half has for increasing a teams win percentage. If the team wins at least the last two rounds in the half we classify the teams as having a “Comeback.” If otherwise it is considered as having “No Momentum.” As is expected , being at a deficit at the end of your attack half is generally less detrimental compared to being at a deficit on defense, so these are also separated.
 
 
 ```{r momentum_table, echo=FALSE, warning = FALSE, fig.width= 10, fig.height= 5, fig.cap = "Table 3"}
@@ -493,15 +492,15 @@ momentum_diff_markdown = momentum_diff_summary %>%
 ```
 
 
-When we look at 3-9 scorelines we see a very interesting increase. When on attack, if you are down 1-9 and win at least the last two rounds in the first half you % chance of victory increases from `r momentum_diff_markdown$'No Momentum' ` to `r momentum_diff_markdown$'Comeback' `, a `r momentum_diff_markdown$'Momentum Difference' ` point increase. The largest increase of the all of the lagging scores.
+When we look at 3-9 scorelines we see a very interesting increase. When on attack, if you are down 1-9 and win at least the last two rounds in the first half your % chance of victory increases from `r momentum_diff_markdown$'No Momentum' ` to `r momentum_diff_markdown$'Comeback' `, a `r momentum_diff_markdown$'Momentum Difference' ` point increase. The largest increase of the all of the lagging scores.
 <br>
 <br>
-While it may not be the case that a score of 9-3 is more detrimental than we would expect, it seems that if the losing teams manages to win at least two of their three rounds in the last two rounds of the first half, they have a significantly higher chance to win compared to if when they did not have momentum. Putting it less than 5% points behind a 4-8 score line for win percentage.
+While it may not be the case that a score of 9-3 is more detrimental than we would expect, it seems that if the losing teams manages to win at least two of their three rounds in the last two rounds of the first half, they have a significantly higher chance to win compared to if when they did not have momentum, putting it less than 5% points behind adding a whole round for a 4-8 score line in regards to win percentage.
 <br>
 <br>
 
 ### Conclusion
-To a conclude, a 3-9 scoreline does not seem to grant an outsized chance of victory. If you find yourself tempted to throw a round to avoid the dreaded 9-3 curse. The reality is that it will not increase your chance of winning. However, the 3-9 scoreline does become when we take into account moment. Of all of the trailing scorelines a team behind 3-9 gains a higher chance to win the match when they win the last two or more rounds of a half. 
+To a conclude, a 3-9 scoreline does not seem to grant an outsized chance of victory. If you find yourself tempted to throw a round to avoid the dreaded 9-3 curse, the reality is that it will not increase your chance of winning. However, the 3-9 scoreline does become relevant when we take into account moment, where of all of the trailing scorelines a team behind 3-9 gains a higher chance to win the match when they win the last two or more rounds of a half. 
 
 
 <br>
