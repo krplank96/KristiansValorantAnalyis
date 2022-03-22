@@ -1,0 +1,522 @@
+---
+title: "9-3 Curse Analysis"
+author: "Kristian Plank"
+header-includes: \setlength\parindent{24pt}
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float: yes
+    theme: darkly
+bibliography: references.bib
+nocite: |
+  @*
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+### Intro
+<div style= "float:right;position: relative; top: 15px;">
+![](C:/Users/17206/Desktop/analysis_project/images/sage_artwork.png){width=200px}
+</div>
+
+What is the 9-3 Curse? 
+<br>
+Is it real? 
+<br>
+If you are already familiar with Valorant and the dreaded “9-3 Curse,” feel free to skip ahead to the "Analysis" section. Valorant is a free-to-play first-person hero shooter played both casually and competitively. The game is played in a 5 vs. 5 round based format. The first team to win 13 of 24 possible rounds wins a match of Valorant. Each round has a timer of 1 minute and 40 seconds. In each round, one team is on Attack with their objective being to plant a Spike at one of two locations or "sites" on the map, which will then take time to detonate. The attackers can win the round by allowing the spike to detonate or eliminating the defending team. The defenders win by eliminating the attacking team prior to planting the spike, defusing a planted spike, or allowing the round timer to run out.
+<br>
+<br>
+Upon completion of 12 rounds, the teams switch sides  — attackers become defenders, and vice versa. If the game is tied at 12-12 on the 24th round, the match goes into Overtime. Prior to each round, players purchase weapons and abilities using the in-game economy. If a player survives with a weapon it can be brought into the next round, but abilities will carry over from round to round until used by the player. A winning team is awarded more money than the losing team, but losing teams earn progressively more money each round they have lost in a row. At the start of the second half, money and equipment is reset.
+
+
+<br>
+<br>
+
+```{r libraries, warning = FALSE, echo = FALSE}
+rm(list = ls())
+
+pacman::p_load(tidyverse, magrittr, janitor, readxl,
+               lubridate, ggplot2, scales, stargazer, 
+               dplyr, ggrepel, ggalt, tidyr, 
+               zoo,  RSQLite, ggdark, showtext, mosaic,
+               reactable, kableExtra, patchwork)
+
+# additional functions
+`%out%` = Negate(`%in%`)
+
+# change text size for ggplots
+text_size_val = 28
+
+
+```
+
+```{r data_readin, warning = FALSE, echo = FALSE, message = FALSE}
+
+# Source for Valorant Pro Matches
+# https://www.kaggle.com/visualize25/valorant-pro-matches-full-data
+
+## connect to db
+con <- dbConnect(drv=RSQLite::SQLite(), dbname="data/valorant.sqlite")
+
+## list all tables
+tables <- dbListTables(con)
+
+## exclude sqlite_sequence (contains table information)
+tables <- tables[tables != "sqlite_sequence"]
+
+l_data_frames <- vector("list", length=length(tables))
+
+## create a data.frame for each table
+for (i in seq(along=tables)) {
+  l_data_frames[[i]] <- dbGetQuery(conn=con, statement=paste("SELECT * FROM '", tables[[i]], "'", sep=""))
+ 
+  }
+
+
+```
+
+### Analysis
+First, a special thanks to Joshua Broas on Kaggle who pulled all of the data used in this analysis from Vlr.gg. The data I used in this analysis includes approximately 11.5k pro and semi-pro Valorant matches as of January 2022. For starters, we have to identify what would define the 9-3 Curse. Is it that we would expect that a team down 3-9 is more likely to win the game than its counterpart that is up 9–3 at the attacker/defender? The chart below shows the percentage of matches won at each round differential at half.
+<br>
+<br>
+
+```{r data_manipulation, warning = FALSE, echo = FALSE, message = FALSE}
+
+
+# Notes: data breakdown
+# 1 round history and team ids
+# 2 player by game
+# 3 match round win information
+# 4 event stats
+
+
+
+# Questions we want to answer
+# how important is full buying to win an eco
+# what amount of investment yields the highest return on a force
+# naming lists
+round_list = paste0("r", seq(1:50))
+info_list = c("RoundWinner", "ScoreAfterRound", "WinType", "Team1Bank", "Team2Bank", "Team1BuyType", "Team2BuyType")
+info_list_gsub_list = "RoundWinner|ScoreAfterRound|WinType|Team1Bank|Team2Bank|Team1BuyType|Team2BuyType"
+extra_char_list = "'|:| |\\{|\\}"
+
+#match info clean up
+match_info_df = l_data_frames[[3]] %>%
+  as.data.frame() %>% 
+  clean_names() %>%
+  select(game_id, match_id, map, team1id, team2id, 
+         team1, team2, winner, team1_side_first_half)
+
+
+# lets clean up our round histories
+round_history_df = l_data_frames[[1]] %>%
+  as.data.frame() %>% 
+  clean_names() %>%
+  filter(!is.na(round_history)) %>%
+  separate(round_history, round_list, sep = ", \\d{1,2}:") %>%
+  pivot_longer(
+    cols = starts_with("r"),
+    names_to = "round",
+    values_to = "info"
+  ) %>%
+  filter(!is.na(info)) %>%
+  mutate(info = gsub(info_list_gsub_list, "", info)) %>%
+  mutate(info = gsub(extra_char_list, "", info)) %>%
+  separate(info, info_list, sep = ",") %>%
+  clean_names() %>% 
+  mutate(round = as.numeric(gsub("r", "", round)), 
+         round_winner = gsub("\\d", "", round_winner),
+         team1bank = as.numeric(team1bank),
+         team2bank = as.numeric(team2bank)) %>%
+  mutate(round_tpye = ifelse(round == 1 | round == 13, "pistol", "other")) %>%
+  left_join(match_info_df) %>% # join with match info
+  separate(score_after_round, c("team1_rounds", "team2_rounds"), sep = "-") %>%
+  mutate(team1_rounds = as.numeric(team1_rounds),
+         team2_rounds = as.numeric(team2_rounds),
+         team1_winner_dummy = ifelse(winner == team1, 1, 0)) %>%
+  mutate(round_difference = team1_rounds - team2_rounds)
+
+# player stats
+player_info_df = l_data_frames[[2]] %>%
+  as.data.frame() %>% 
+  clean_names() 
+
+
+
+# is the 9-3 Curse Real
+# lets limit to games that have a 9-3 score line
+# score at half win percentage
+# to solve this we list each game twice, with each team as team1 and team2
+
+# First lets make a "flipped" version of the dataframe
+# We have to list each column twice to get the two to switch
+round_history_df_flip = round_history_df %>% 
+  mutate(game_id = paste0(game_id, "B"),
+         match_id = paste0(match_id, "B")) %>% # lets add a B and an A to the game id for the duplicates
+  mutate(team1id_flip = team1id,
+         team2id_flip = team2id,
+         team1_rounds_flip = team1_rounds,
+         team2_rounds_flip = team2_rounds,
+         team1bank_flip = team1bank,
+         team2bank_flip = team2bank,
+         team1buy_type_flip = team1buy_type,
+         team2buy_type_flip = team2buy_type,
+         team1_flip = team1,
+         team2_flip = team2) %>%
+  mutate(team1id = team2id_flip,
+         team2id = team1id_flip,
+         team1_rounds = team2_rounds_flip,
+         team2_rounds = team1_rounds_flip,
+         team1bank = team2bank_flip,
+         team2bank = team1bank_flip,
+         team1buy_type = team2buy_type_flip,
+         team2buy_type = team1buy_type_flip,
+         team1 = team2_flip,
+         team2 = team1_flip) %>%
+  select(-ends_with("_flip")) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "defend", "attack"),
+         team1_winner_dummy = ifelse(team1_winner_dummy == 1, 0, 1),
+         round_difference = round_difference*-1)
+
+
+round_history_df = round_history_df %>% 
+  mutate(game_id = paste0(game_id, "A"),
+         match_id = paste0(match_id, "A")) %>%
+  rbind(round_history_df_flip) 
+
+# delete flipped half of data sett as it is binded now
+rm(round_history_df_flip)
+
+# create a summary dataset for a plot
+halftime_score_df_summary = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+  
+```
+
+
+
+
+
+```{r win_loss_plots, echo=FALSE, warning = FALSE, message = FALSE, fig.width= 10, fig.height= 5, fig.cap = "Figure 1"}
+
+
+img <- png::readPNG("./images/valorant_logo.png")
+rast <- grid::rasterGrob(img, interpolate = T)
+
+# font options: https://fonts.google.com/
+font_add_google("Montserrat", "montserrat")  # Use the actual file path
+showtext_auto()
+
+
+round_diff_plot = halftime_score_df_summary %>% 
+ggplot(aes(x=score_diff_at_half, y=pct_victory)) +
+  annotation_custom(rast, ymin = .8, ymax = .95, xmin = -12) +
+  geom_bar(stat="identity", fill="#FF4654")+
+  scale_x_continuous(breaks = seq(-12, 12, 2)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 100)) + 
+  geom_text(aes(label = paste0(round(pct_victory,3)*100, "%" )), vjust = 1.5, colour = "white") +
+  ggtitle("Scoreline at Halftime vs. Win % Victorious") +
+  ylab("% Victorious") +
+  xlab("Round Difference at Half") +
+  dark_theme_classic(base_family = "montserrat", base_size = 14) + 
+  theme(
+    text = element_text(size = text_size_val),
+    panel.background = element_rect(fill = "#191530",
+                                    colour = "#191530",
+                                    size = 0.5, linetype = "solid"),
+    plot.background = element_rect(fill = "#191530"),
+    strip.background =element_rect(fill="#191530")
+  ) +
+  facet_wrap(~team1_side_first_half)
+
+
+round_diff_plot
+
+
+```
+<br>
+<br>
+This initial analysis would show the curse to be false. In the chart, the X-axis is the round difference at half, i.e. a round difference of 0 would be a 6-6 half and a round difference of 12 would be a 12-0 half. The chart labeled “Attack” is for teams starting on attack and vice-versa for “Defend.” These are important to note as Valorant is generally a defense-sided game, as defenders will win more rounds than attackers. This chart shows that when the score is tied 6-6 at half, the team that started on the attack side will win 53.1% of matches compared to the defending team winning 45.9% of matches.
+<br>
+<br>
+As one would expect, having an advantage of 6 rounds is always beneficial with win percentages above 90% on both Attack and Defense. Furthermore, it is clearly not beneficial to have a scoreline of 8-4 to avoid the 9-3 Curse, as this lowers the percentage win to roughly 80% for the leading team.
+<br>
+<br>
+Depending on our definition of the 9-3 Curse, these numbers seem quite definitive, having a lead of 6 rounds means said leader will win 9 out of 10 games. However, while having a score difference of 9-3 at half may increase your % chance to win versus having an 8-4 lead, the question still remains  — does it increase the % of victory as much as we would expect? To understand what percentage of victory we should expect, we will need to create a function to understand how an increase in round difference at half is correlated with the percentage likelihood of victory. 
+
+<br>
+
+```{r regression _plots, echo=FALSE, results = 'asis', warning = FALSE, message = FALSE, fig.cap = "Table 1"}
+# lets fit a function to our plot
+halftime_score_df_summary_sample = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) #%>%
+  #sample_n(round(nrow(.)/2, 0)) 
+
+halftime_score_df_summary_test = round_history_df %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  #filter(game_id %out% halftime_score_df_summary_sample$game_id)  %>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+
+halftime_score_df_summary_sample %<>%
+  group_by(score_diff_at_half, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(score_diff_at_half > -1) 
+
+
+halftime_score_df_defend_reg = halftime_score_df_summary_sample %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Defend")
+
+halftime_score_df_attack_reg = halftime_score_df_summary_sample %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Attack")
+
+
+halftime_score_df_defend_reg_test = halftime_score_df_summary_test %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Defend")
+
+halftime_score_df_attack_reg_test = halftime_score_df_summary_test %>%
+  filter(score_diff_at_half != 6 & team1_side_first_half == "Attack")
+
+
+# create regressions for attack and defend
+#linear regressions
+reg_defend_linear <- lm(pct_victory ~ score_diff_at_half, data=halftime_score_df_defend_reg)
+reg_attack_linear <- lm(pct_victory ~ score_diff_at_half, data=halftime_score_df_attack_reg)
+#non linear regressions
+reg_defend_non_linear_1 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2), data=halftime_score_df_defend_reg)
+reg_attack_non_linear_1 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2), data=halftime_score_df_attack_reg)
+#non linear regressions with cubed piece
+reg_defend_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_defend_reg)
+reg_attack_non_linear_2 <- lm(pct_victory ~ score_diff_at_half + I(score_diff_at_half^2)+ I(score_diff_at_half^3), data=halftime_score_df_attack_reg)
+
+# stargazer of model
+
+stargazer(reg_defend_linear, reg_attack_linear, 
+          reg_defend_non_linear_1, reg_attack_non_linear_1,
+          reg_defend_non_linear_2, reg_attack_non_linear_2, 
+          dep.var.labels = "% Victorious",
+          column.labels=c("Defend","Attack", "Defend","Attack", "Defend","Attack"),
+          covariate.labels = 
+            c("Score Difference at Half", "Score Difference at Half (Squared)", "Score Difference at Half (Cubed)"),
+          type = "html")
+
+
+# save predictions of the model in the new data frame 
+# together with variable you want to plot against
+halftime_score_df_defend = halftime_score_df_summary_test %>%
+  filter(team1_side_first_half == "Defend")
+
+predicted_defend_df <- data.frame(pct_victory_pred = predict(reg_defend_non_linear_2, halftime_score_df_defend))
+predicted_defend_df = cbind(halftime_score_df_defend, predicted_defend_df)
+
+halftime_score_df_attack = halftime_score_df_summary_test %>%
+  filter(team1_side_first_half == "Attack")
+
+predicted_attack_df <- data.frame(pct_victory_pred = predict(reg_attack_non_linear_2, halftime_score_df_attack))
+predicted_attack_df = cbind(halftime_score_df_attack, predicted_attack_df)
+
+
+
+
+```
+
+<br>
+In order to do this we create two regressions based on the data from the chart above. Our dependent variable will be the percentage chance of victory and our independent variable will be our round lead. Again we will just limit this to positive round leads, as negative round leads would simply be the inverse. We also create two different regressions with data for teams with a lead on the defenders side and one for teams on the attacking side. We have also removed the data point where the round lead is at +6, (our supposedly cursed lead), in order to not fit the regression using this data point as we suspect it to be substantially different than the others. We than create two regressions with results shown below:
+<br>
+<br>
+We then use the following regression for a defense lead:
+\begin{align*}
+Percent Victorious = 0.111(Score Diff) - 0.007(Score Diff)^2 + 0.0001(Score Diff)^3 + 0.468  
+\end{align*}
+
+And for an attack lead:
+
+\begin{align*}
+Percent Victorious = 0.098(Score Diff) - 0.006(Score Diff)^2 + 0.0001(Score Diff)^3 + 0.529  
+\end{align*}
+
+<br>
+The R^2 for these is as we would expect quite high —  nearly .99, indicating a near exact fit. If we now use predict the values for a round lead based off this we can get a residual for +6 of :
+<br>
+<br>
+To answer the question of if the increase of percentage victory is substantially different than what we would expect, the answer is no.
+
+
+<br>
+
+```{r function_plots, echo=FALSE, warning = FALSE, fig.width= 12, fig.height= 6, fig.cap = "Figure 2"}
+
+# this is the predicted line of multiple linear regression
+function_plot_defend = ggplot(data = predicted_defend_df, aes(x = score_diff_at_half, y = pct_victory)) + 
+  annotation_custom(rast, ymin = .6, ymax = .8, xmin = 6, xmax = 11) +
+  geom_point(color='white') +
+  geom_line(color="#FF4654",data = predicted_defend_df, aes(x=score_diff_at_half, y=pct_victory_pred)) + 
+  scale_x_continuous(breaks = seq(-12, 12, 2)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 100), breaks = seq(.6, 1, .2), limits = c(.45,1.05)) + 
+  ggtitle("Defense") +
+  ylab("% Victorious") +
+  xlab("Round Difference at Half") +
+  dark_theme_classic(base_family = "montserrat", base_size = 14) + 
+  theme(
+    text = element_text(size = text_size_val),
+    panel.background = element_rect(fill = "#191530",
+                                    colour = "#191530",
+                                    size = 0.5, linetype = "solid"),
+    plot.background = element_rect(fill = "#191530"),
+    strip.background =element_rect(fill="#191530")
+  )
+
+function_plot_attack = ggplot(data = predicted_attack_df, aes(x = score_diff_at_half, y = pct_victory)) + 
+  annotation_custom(rast, ymin = .6, ymax = .8, xmin = 6, xmax = 11) +
+  geom_point(color='white') +
+  geom_line(color="#FF4654",data = predicted_attack_df, aes(x=score_diff_at_half, y=pct_victory_pred)) + 
+  scale_x_continuous(breaks = seq(-12, 12, 2)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 100), breaks = seq(.6, 1, .2), limits = c(.45,1.05)) + 
+  ggtitle("Attack") +
+  ylab("% Victorious") +
+  xlab("Round Difference at Half") +
+  dark_theme_classic(base_family = "montserrat", base_size = 14) + 
+  theme(
+    text = element_text(size = text_size_val),
+    panel.background = element_rect(fill = "#191530",
+                                    colour = "#191530",
+                                    size = 0.5, linetype = "solid"),
+    plot.background = element_rect(fill = "#191530"),
+    strip.background =element_rect(fill="#191530")
+  )
+
+
+# use patchwork to paste these together
+function_plot_defend + function_plot_attack
+
+```
+<br>
+In Figure 2 our predicted values are represented by the red line while our actual values are represented by the white dots. The dots and our function line up well. The deviation looks fairly minor but we should analyze the values to be sure.
+<br>
+<br>
+```{r predicted_vs_actual, warning = FALSE, echo = FALSE, message = FALSE, fig.width= 10, fig.height= 5, fig.cap = "Table 2"}
+
+
+# lets compare each of the points to their predicted point
+predicted_defend_df %>%
+  rbind(predicted_attack_df)  %>%
+  mutate(Residual = abs(pct_victory - pct_victory_pred)) %>%
+  rename(`Score Difference` = score_diff_at_half, `First Half Side` = team1_side_first_half,
+         `% Victorious` = pct_victory, `% Victorious (Predicted)` = pct_victory_pred,
+         ) %>%
+  mutate(`% Victorious` = paste0(round(`% Victorious`, 4)*100, "%"),
+         `% Victorious (Predicted)` = paste0(round(`% Victorious (Predicted)`, 4)*100, "%") ,
+         Residual = paste0(round(Residual, 4)*100, "%") ) %>%
+  kbl() %>%
+  kable_material_dark()
+
+```
+<br>
+<br>
+In the above table we compare our predicted values for % Victorious versus our actual values. However, our residuals don’t appear significant enough to suggest that a round difference of 6 rounds at half (a score line of 9-3), is significantly different from the function we are using to calculate the other score differences.
+
+```{r momentum, warning = FALSE, echo = FALSE, message = FALSE}
+
+
+# what does momentum do to the 9-3 curse
+# ID rounds with chance of momentum
+possible_momentum = round_history_df %>%
+  group_by(game_id) %>%
+  arrange(game_id, round) %>%
+  mutate(two_round_lag = lag(round_difference, 2)) %>%
+  mutate(score_diff_at_half = ifelse(round == 12, round_difference, NA)) %>%
+  filter(!is.na(score_diff_at_half)) %>%
+  mutate(
+    momentum_dummy = case_when(
+      two_round_lag == -8 & round_difference == -6 ~ "Comeback", # 1-9 to 3-9
+      two_round_lag == 8 & round_difference == 6 ~ "Comeback", # 9-1 to 9-3 
+      two_round_lag == -6 & round_difference == -4 ~ "Comeback", # 2-8 to 4-8
+      two_round_lag == 6 & round_difference == 4 ~ "Comeback", # 8-2 to 8-4
+      two_round_lag == -4 & round_difference == -2 ~ "Comeback", # 3-7 to 5-7
+      two_round_lag == 4 & round_difference == 2 ~ "Comeback", # 7-3 to 7-5
+      two_round_lag == -10 & round_difference == -8 ~ "Comeback", # 0-10 to 2-10
+      two_round_lag == 10 & round_difference == 8 ~ "Comeback", # 10-0 to 10-2
+      TRUE                      ~ "No Momentum"
+    )
+  )
+  
+
+# summarise the momentum data
+momentum_diff_summary = possible_momentum %>%
+  mutate(score_line = paste0(team1_rounds, "-", team2_rounds)) %>%
+  group_by(momentum_dummy, score_line, round_difference, team1_side_first_half) %>%
+  summarise(pct_victory = mean(team1_winner_dummy, na.rm = T)) %>%
+  mutate(team1_side_first_half = ifelse(team1_side_first_half == "attack", "Attack", "Defend")) %>%
+  filter(abs(round_difference) %out% c(0, 10, 12)) %>%
+  arrange(round_difference, team1_side_first_half) %>%
+  pivot_wider(names_from = "momentum_dummy", values_from = "pct_victory") %>%
+  ungroup() %>%
+  mutate(`Momentum Difference` =  `Comeback` - `No Momentum`) %>%
+  filter(round_difference < 0) %>%
+  select(`Score Line` = score_line, `Start Side` = team1_side_first_half, `No Momentum`, `Comeback`, `Momentum Difference`) %>%
+  mutate(`No Momentum` = paste0(round(`No Momentum`, 3)*100, "%"),
+         `Comeback` = paste0(round(`Comeback`, 3)*100, "%"),
+         `Momentum Difference` = paste0(round(`Momentum Difference`, 3)*100, "%"))
+
+
+
+
+
+
+
+
+```
+
+
+<br>
+<br>
+
+### Momentum
+While it may seem like the 9-3 curse is simply non-existent, one factor we have not looked into is momentum. Due to Valorant being a round based game with an economy being persistent from round, winning multiple rounds in a row is beneficial in a very tangible way and also most likely has a strong psychological effect on the players in the game, even when the economy is not being taken into account  —  for example, at the start of a second half.
+
+In the chart below we can see the difference that winning the last rounds in the half has for increasing a teams win percentage. If the team wins at least the last two rounds in the half we classify the teams as having a “Comeback.” If otherwise it is considered as having “No Momentum.” As is expected , being at a deficit at the end of your attack half is generally less detrimental compared to being at a deficit on defense, so these are also separated.
+
+
+```{r momentum_table, echo=FALSE, warning = FALSE, fig.width= 10, fig.height= 5, fig.cap = "Table 3"}
+
+
+# here we can see that going from 1-9 to 3-9 on attack adds an additional 5.4% chance of victory, pretty significant
+momentum_diff_summary %>%
+  kbl() %>%
+  kable_material_dark()
+
+momentum_diff_markdown = momentum_diff_summary %>%
+  filter(`Score Line` == "3-9" & `Start Side` == "Attack")
+
+
+```
+
+
+When we look at 3-9 scorelines we see a very interesting increase. When on attack, if you are down 1-9 and win at least the last two rounds in the first half your % chance of victory increases from `r momentum_diff_markdown$'No Momentum' ` to `r momentum_diff_markdown$'Comeback' `, a `r momentum_diff_markdown$'Momentum Difference' ` point increase. The largest increase of the all of the lagging scores.
+<br>
+<br>
+While it may not be the case that a score of 9-3 is more detrimental than we would expect, it seems that if the losing teams manages to win at least two of their three rounds in the last two rounds of the first half, they have a significantly higher chance to win compared to if when they did not have momentum, putting it less than 5% points behind adding a whole round for a 4-8 score line in regards to win percentage.
+<br>
+<br>
+
+### Conclusion
+To a conclude, a 3-9 scoreline does not seem to grant an outsized chance of victory. If you find yourself tempted to throw a round to avoid the dreaded 9-3 curse, the reality is that it will not increase your chance of winning. However, the 3-9 scoreline does become relevant when we take into account momentum, where of all of the trailing scorelines a team behind 3-9 gains a higher chance to win the match when they win the last two or more rounds of a half. 
+
+
+<br>
+<br>
+
+### Methods
